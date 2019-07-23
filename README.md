@@ -2,36 +2,6 @@
 
 R script for wrangling the joint locations / orientations together for some machine learning
 
-## What is new in KiMoRe
-
-![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/comparison.png "Comparison")
-
-In the present work, the authors propose a **comparison of the KIMORE dataset** with some of those available in literature, focused on the rehabilitation context. In detail, **Table I** summarizes the characteristics of the proposed dataset with respect to the others cited [30], [55]–[58] that compile rehabilitation exercises, with the exception of the dataset in [57] that presents the movement assessment of standardized tests selected by clinicians. The authors identified the most salient factors, described in Table I and chosen according to those discussed in [38] (i.e., dataset size, applicability, evaluation protocols) in order to measure and compare the reliability of the proposed dataset with respect to other works. All the steps in Table I were previously carried out with the proposed KIMORE dataset in [18], [32], [36], [37]. Differently from the other datasets, KIMORE provides the two main data modalities (i.e., **RGB and Depth**). This aspect **opens up a whole range of possibilities for testing several computer vision approaches** which are **not directly based on clinical features and Kinect skeleton tracking**. For instance, open frameworks, such as **OpenPose** [59], may be used to obtain virtual skeleton joints directly from RGB data.
-
-With respect to the enrolled population, the analyzed datasets, coming from the literature, included smaller samples, ranging from a minimum of 5 subjects, as in [30], to a maximum of 54 in [57] with a prevalence of healthy subjects
-and a limited age range; conversely, in the **proposed dataset**, the number of people involved in the study, **78, is larger than in other works** [30], [55]–[58] and the subjects display a wider range of age and health/disability conditions. 
-
-Note that, almost all the reported datasets are accessible and published, except for the one proposed in [30], which was developed with the sole purpose to **allow physiotherapists and patients to test the prototype of the telerehabilitation system**. It is worth bearing in mind that the proposed dataset has been validated in [32] and that the preprocessing step described here is not reported in the presentation of other available works; they do not present data or specific information related to pre-processing.
-
-Although the aim of many papers showing a dataset is to obtain an evaluation of the subject’s movement, **only a few of them present a feature extraction method** [30], [56], [57] to provide performance assessment. Differently from the approach introduced in this study, the authors in [56] and [57] proposed a feature selection based on a *decision forest* [56] and a *k-means clustering* [57]. Feature extraction, **encapsulating prior clinical knowledge** related to the objective and kinematic constraints of physical exercises, is chosen by these authors to obtain salient motion features for movement assessment, while all the works introduce a direct exercise evaluation through the different *machine learning methods* adopted (i.e., support vector machine, artificial neural networks). 
-
-In the cited survey [52], the authors observed that size, applicability, feasibility of ground truth labels and evaluation
-protocols are lacking in the available literature on RGB-D-based datasets, notwithstanding the **importance of providing
-a reliable tool for motion analysis supporting rehabilitation**, as emerged from preliminary reports [60]. They showed that detection supported exercise therapy produced similar or **even better enhanced clinical outcomes** compared to conventional
-exercise therapy [61]. From this perspective, only the proposed KIMORE dataset **includes annotations made by expert
-clinicians**, of the same exercises performed by the different enrolled subjects,through the compilation of a designed questionnaire which is reported in Section II-F and published in [18]. Moreover, the assessment is not only related to all the exercises, but the total score is obtained by averaging the local scores, related to the primary outcome, and the kinematic constraints described for each exercise. The **contribution of a medical staff**, to describe the features and to evaluate the performance, is **not introduced in any other work**.
-
-The main contributions of the introduced KIMORE dataset compared to the related literature are:
-
-* the high number and heterogeneity of enrolled subjects with respect to the literature;
-* the organization of collected data in different groups on the basis of diagnosis or expertise;
-* the collaborative approach between engineers and clinicians in designing the experimental procedure;
-* the identification by clinicians of two main groups of features to monitor, defined as primary outcomes and postural constraints;
-* the accurate description of the main motor task features together with a specific algorithm for their extraction,
-available with the *Matlab code*.
-* the **annotation of the dataset carried out by two expert clinicians** according to a questionnaire validated in [37], related to the achievement of the primary outcomes and kinematic constraints of each exercise, is included. 
-* KIMORE reports **core exercises useful in widespread pathological conditions** (i.e., back pain and postural disturbances) [34], [35] providing a detailed dataset for rehabilitation subjects of all ages and socioeconomic status who seek health care [66]. Although the present study *was run at a **hospital facility**, in order to respond to validation needs*, the architecture was built **to be easily delivered at home**.
-
 ## Data Structure
 
 ![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/data_structure.png "Data")
@@ -70,6 +40,36 @@ The dataset description is shown in Figure 3. The enrolled population is present
 From the absolute quaternion configuration of the Kinect-based motion capture system, it is possible to retrieve the **relative quaternions**, defined with respect to their parent segment quaternion. This process can be performed following the parent/child multiplications along the quaternion body chain [33]. Subsequently, the conversion of the relative quaternions **into Euler angles** leads to the derivation of **meaningful joint angles** (notice that this procedure may lead to the problem of **gimbal lock [33])**. 
 
 **Goals (POs) and constraints (CFs)** became **descriptors of the movemen**t, in terms of body segments, distances between anatomical landmarks, and relative angles. Specifically, **POs** are the target descriptors that change in order to **reach the exercise goal** (e.g., the *maximum range of motion* of the upper limbs during their lifting on the frontal plane as for Exercise 3 and the maximum knee flexion on the sagittal plane as in Exercise 5). On the contrary, **CFs represent physical constraints** which have to be **maintained during the exercise** (e.g., *correct trunk alignment* along the sagittal, frontal and transversal plane as in Exercise 2 or stability and complete elbow extension during Exercise 1). In general, correct body alignment during motion is a fundamental requirement for *minimizing exercise side effects* (pain and muscle contractures) and maximizing the muscle force output during movement. *CFs are time series, scalar values that change respect to the time during the exercise execution*, while *POs are vectors with the same number of elements as the repetitions number and refer to the maximum and minimum of the signal*. Both CFs and POs can be considered as **vector time series** because they are time ordered.
+
+## What is new in KiMoRe
+
+![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/comparison.png "Comparison")
+
+In the present work, the authors propose a **comparison of the KIMORE dataset** with some of those available in literature, focused on the rehabilitation context. In detail, **Table I** summarizes the characteristics of the proposed dataset with respect to the others cited [30], [55]–[58] that compile rehabilitation exercises, with the exception of the dataset in [57] that presents the movement assessment of standardized tests selected by clinicians. The authors identified the most salient factors, described in Table I and chosen according to those discussed in [38] (i.e., dataset size, applicability, evaluation protocols) in order to measure and compare the reliability of the proposed dataset with respect to other works. All the steps in Table I were previously carried out with the proposed KIMORE dataset in [18], [32], [36], [37]. Differently from the other datasets, KIMORE provides the two main data modalities (i.e., **RGB and Depth**). This aspect **opens up a whole range of possibilities for testing several computer vision approaches** which are **not directly based on clinical features and Kinect skeleton tracking**. For instance, open frameworks, such as **OpenPose** [59], may be used to obtain virtual skeleton joints directly from RGB data.
+
+With respect to the enrolled population, the analyzed datasets, coming from the literature, included smaller samples, ranging from a minimum of 5 subjects, as in [30], to a maximum of 54 in [57] with a prevalence of healthy subjects
+and a limited age range; conversely, in the **proposed dataset**, the number of people involved in the study, **78, is larger than in other works** [30], [55]–[58] and the subjects display a wider range of age and health/disability conditions. 
+
+Note that, almost all the reported datasets are accessible and published, except for the one proposed in [30], which was developed with the sole purpose to **allow physiotherapists and patients to test the prototype of the telerehabilitation system**. It is worth bearing in mind that the proposed dataset has been validated in [32] and that the preprocessing step described here is not reported in the presentation of other available works; they do not present data or specific information related to pre-processing.
+
+Although the aim of many papers showing a dataset is to obtain an evaluation of the subject’s movement, **only a few of them present a feature extraction method** [30], [56], [57] to provide performance assessment. Differently from the approach introduced in this study, the authors in [56] and [57] proposed a feature selection based on a *decision forest* [56] and a *k-means clustering* [57]. Feature extraction, **encapsulating prior clinical knowledge** related to the objective and kinematic constraints of physical exercises, is chosen by these authors to obtain salient motion features for movement assessment, while all the works introduce a direct exercise evaluation through the different *machine learning methods* adopted (i.e., support vector machine, artificial neural networks). 
+
+In the cited survey [52], the authors observed that size, applicability, feasibility of ground truth labels and evaluation
+protocols are lacking in the available literature on RGB-D-based datasets, notwithstanding the **importance of providing
+a reliable tool for motion analysis supporting rehabilitation**, as emerged from preliminary reports [60]. They showed that detection supported exercise therapy produced similar or **even better enhanced clinical outcomes** compared to conventional
+exercise therapy [61]. From this perspective, only the proposed KIMORE dataset **includes annotations made by expert
+clinicians**, of the same exercises performed by the different enrolled subjects,through the compilation of a designed questionnaire which is reported in Section II-F and published in [18]. Moreover, the assessment is not only related to all the exercises, but the total score is obtained by averaging the local scores, related to the primary outcome, and the kinematic constraints described for each exercise. The **contribution of a medical staff**, to describe the features and to evaluate the performance, is **not introduced in any other work**.
+
+The main contributions of the introduced KIMORE dataset compared to the related literature are:
+
+* the high number and heterogeneity of enrolled subjects with respect to the literature;
+* the organization of collected data in different groups on the basis of diagnosis or expertise;
+* the collaborative approach between engineers and clinicians in designing the experimental procedure;
+* the identification by clinicians of two main groups of features to monitor, defined as primary outcomes and postural constraints;
+* the accurate description of the main motor task features together with a specific algorithm for their extraction,
+available with the *Matlab code*.
+* the **annotation of the dataset carried out by two expert clinicians** according to a questionnaire validated in [37], related to the achievement of the primary outcomes and kinematic constraints of each exercise, is included. 
+* KIMORE reports **core exercises useful in widespread pathological conditions** (i.e., back pain and postural disturbances) [34], [35] providing a detailed dataset for rehabilitation subjects of all ages and socioeconomic status who seek health care [66]. Although the present study *was run at a **hospital facility**, in order to respond to validation needs*, the architecture was built **to be easily delivered at home**.
 
 ## Clinical Validation
 
