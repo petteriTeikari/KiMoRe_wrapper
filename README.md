@@ -1,6 +1,23 @@
 # KiMoRe Wrangling and Analysis
 
-R script for wrangling the joint locations / orientations together for some machine learning
+## Matlab wrangling and reshaping
+
+You need to place the `Kimore` Dataset `../Kimore` in relation to this repository (of course you can change this but you need to change the code as well), see:
+
+![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/init_hdf5.png "kimore_placement.png")
+
+Standardizing the data and checking for data quality with the Matlab script `matlab_to_R_batch_converter.m` that exports the checked data as `.mat` and `.hdf5` files, with the following hierarchical data structure:
+
+![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/init_hdf5.png "init_hdf5.png")
+
+**Joint Data:** *Subject Code -> excercises -> Ex_idx -> joints -> Joint_Name - > 9 columns [0-8] with as many samples as recorded* Column names: `time_ms	cameraX	cameraY	cameraZ	confidenceState	AbsQuat_1	AbsQuat_2	AbsQuat_3	AbsQuat_4`
+
+**Metadata:** _gender / age / group_ and here the `group`is your classification label in integers with the following LUT
+* CG-E = 0 (Control, Expert)
+* CG-NE = 1 (Control, Non-Expert)
+* GPP-S = 2 (Stroke)
+* GPP-P = 3 (Parkinson’s disease)
+* GPP-B = 4 (Low Back Pain)
 
 ## KiMoRe
 
