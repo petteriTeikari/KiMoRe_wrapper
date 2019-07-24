@@ -43,22 +43,27 @@ function matlab_to_R_batch_converter()
     
     %% Combine the meta data with the arranged joint data
         
-        joints_w_meta = combine_meta_with_joints(joint_tables, meta_as_struct);
+        % joints_w_meta = combine_meta_with_joints(joint_tables, meta_as_struct);
     
     %% Combine the derived features
+    
         % TODO!    
         % joints_meta_feats = combine_derived_feats(joint_matrices, meta_as_struct);
         
     %% Export the data to disk (to be used in R / Python)
         
-        export_to_disk(joints_w_meta)
+        export_to_disk(joint_tables, meta_as_struct)
 
 end
 
-function export_to_disk(joints_structure) 
+function export_to_disk(joints_structure, meta_as_struct) 
     
     %% Quick'n'dirty .mat export (if you continue with Matlab analysis)
     save(fullfile(pathData, 'arranged_data.mat'), 'joints_structure')
+    
+    %% HDF5 export
+    hdf5export_wrapper(fullfile(pathData, 'KiMoRe.h5'), joints_structure, meta_as_struct)
+
 
 end
 

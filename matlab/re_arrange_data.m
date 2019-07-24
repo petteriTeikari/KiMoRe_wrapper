@@ -11,7 +11,7 @@ function joint_tables = re_arrange_data(data_as_struct)
             
             data_in = data_as_struct.(subj_codes{subj}).(exercises{ex});
             
-            joint_tables.(subj_codes{subj}).(exercises{ex}) = combine_columns(data_in);
+            joint_tables.(subj_codes{subj}).(exercises{ex}).joints = combine_columns(data_in);
             
         end
     end
