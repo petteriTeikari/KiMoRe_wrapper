@@ -6,7 +6,7 @@ You need to place the `Kimore` Dataset `../Kimore` in relation to this repositor
 
 ![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/kimore_placement.png "kimore_placement.png")
 
-Standardizing the data and checking for data quality with the Matlab script `matlab_to_R_batch_converter.m` that exports the checked data as `.mat` and `.hdf5` files, with the following hierarchical data structure:
+Standardizing the data and checking for data quality with the Matlab script `matlab_to_R_batch_converter.m` (found from [`matlab`-folder](https://github.com/petteriTeikari/KiMoRe_wrapper/blob/master/matlab/matlab_to_R_batch_converter.m))that exports the checked data as `.mat` and `.hdf5` files, with the following hierarchical data structure:
 
 ![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/init_hdf5.png "init_hdf5.png")
 
