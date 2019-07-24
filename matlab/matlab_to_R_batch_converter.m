@@ -16,8 +16,10 @@ function matlab_to_R_batch_converter()
     %% Define data location    
     
         fileName = mfilename; fullPath = mfilename('fullpath');
-        pathCode = strrep(fullPath, fileName, ''); cd(pathCode)        
-        pathData = fullfile(pathCode, '..', '..', 'KiMoRe');       
+        pathCode = strrep(fullPath, fileName, '');
+        cd(pathCode)        
+        pathData = fullfile(pathCode, '..', '..', 'KiMoRe');
+        
        
     %% Import the raw data from the disk
     
@@ -30,24 +32,33 @@ function matlab_to_R_batch_converter()
             disp('Skipping the import from folders, and read the pre-imported .mat')
             load(fullfile(pathData, 'folder_import.mat'))
         end
-        whos
         
     %% Compute the "derived features"
     
         derived_features = compute_derived_features(data_as_struct, meta_as_struct);
+    
+    %% Re-arrange the joint data
+        
+        joint_tables = re_arrange_data(data_as_struct);
+    
+    %% Combine the meta data with the arranged joint data
+        
+        joints_w_meta = combine_meta_with_joints(joint_tables, meta_as_struct);
+    
+    %% Combine the derived features
+        % TODO!    
+        % joints_meta_feats = combine_derived_feats(joint_matrices, meta_as_struct);
         
     %% Export the data to disk (to be used in R / Python)
         
-        export_to_disk(data_as_struct, meta_as_struct, derived_features)
+        export_to_disk(joints_w_meta)
 
 end
 
-function export_to_disk(data_as_struct, meta_as_struct, derived_features) 
+function export_to_disk(joints_structure) 
     
-    %%
-    [column_headers, time_vector, joint_matrices] = re_arrange_data(data_as_struct);
-    save(fullfile(pathData, 'arranged_data.mat'), ...
-        'column_headers', 'time_vector', 'joint_matrices', 'meta_as_struct')
+    %% Quick'n'dirty .mat export (if you continue with Matlab analysis)
+    save(fullfile(pathData, 'arranged_data.mat'), 'joints_structure')
 
 end
 

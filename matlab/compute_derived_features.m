@@ -21,19 +21,30 @@ end
 
 function [CF_feats, PO_feats] = feature_wrapper(data_in, ex_idx, subj_code)
     
-    switch ex_idx
-        case 1            
-             [CF_feats, PO_feats] = wrapper_Ex1(data_in);
-        case 2
-            [CF_feats, PO_feats] = wrapper_Ex2(data_in);
-        case 3
-            [CF_feats, PO_feats] = wrapper_Ex3(data_in);
-        case 4
-            [CF_feats, PO_feats] = wrapper_Ex4(data_in);
-        case 5            
-            [CF_feats, PO_feats] = wrapper_Ex5(data_in);
-        otherwise
-            warning(['You should never have an exercise index of ', num2str(ex_idx)])
+    CF_feats = NaN;
+    PO_feats = NaN;
+    
+    if isempty(ex_idx)
+        
+        warning(['How come your ex_idx is empty now for subject = ', subj_code])
+        
+    else
+    
+        switch ex_idx
+            case 1            
+                 [CF_feats, PO_feats] = wrapper_Ex1(data_in);
+            case 2
+                [CF_feats, PO_feats] = wrapper_Ex2(data_in);
+            case 3
+                [CF_feats, PO_feats] = wrapper_Ex3(data_in);
+            case 4
+                [CF_feats, PO_feats] = wrapper_Ex4(data_in);
+            case 5            
+                [CF_feats, PO_feats] = wrapper_Ex5(data_in);
+            otherwise
+                warning(['You should never have an exercise index of ', num2str(ex_idx)])
+        end
+        
     end
 
 end
