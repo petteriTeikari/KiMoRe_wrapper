@@ -12,7 +12,7 @@ Standardizing the data and checking for data quality with the Matlab script `mat
 
 **Joint Data:** *Subject Code -> excercises -> Ex_idx -> joints -> Joint_Name - > 9 columns [0-8] with as many samples as recorded* Column names: `time_ms	cameraX	cameraY	cameraZ	confidenceState	AbsQuat_1	AbsQuat_2	AbsQuat_3	AbsQuat_4`
 
-**Metadata:** _gender / age / group_ and here the `group`is your classification label in integers with the following LUT
+**Metadata:** _gender_ (0 = female, 1 = male) / _age_ (in years) / _group_ and here the `group`is your classification label in integers with the following LUT
 * CG-E = 0 (Control, Expert)
 * CG-NE = 1 (Control, Non-Expert)
 * GPP-S = 2 (Stroke)
