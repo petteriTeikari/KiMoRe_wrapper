@@ -17,6 +17,7 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
     %% Go through the subfolders    
         
         subjCount = 0;
+        problem_free_sessions = logical(zeros())
     
         for group = 1 : length(dirinfo)
           thisdir = dirinfo(group).name;
@@ -48,29 +49,25 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
                                    import_label_data(full_path, dirinfo6, ' ', exercise, subject);
                            elseif strcmp(thisdir5, 'Raw') 
                                class_label = [thisdir, thisdir2];
-                               [samples_pos, samples_orient, col_headers_pos, col_headers_orient, timestamps, fps] = ...
+                               [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
+                                   timestamps, fps, prob_joints_pos, prob_joints_orient, unexpec_cols, noRaw] = ...
                                    import_raw_data(full_path, dirinfo6, ' ', exercise, thisdir3, plot_ON_to_disk, pathData, class_label);
                            else
                                % disp(['No specific action defined for subfolder name = ', thisdir5])
                            end                            
                             
-                        end
+                        end           
                         
-                        % check that all the joints were read properly and
-                        % there were no bugs (quick'n'dirty unit testing)                        
-                        pos_no_of_joints_read =  length(samples_pos);                  
-                        orient_no_of_joints_read = length(samples_orient);
-                        
-                        if pos_no_of_joints_read ~= 25 
-                           warning(['For some reasons we did not get 25 joints for position data? Read ', ...
-                               pos_no_of_joints_read, ' joints, for subject = ', thisdir3])
-                        end
-                        
-                        if orient_no_of_joints_read ~= 25 
-                           warning(['For some reasons we did not get 25 joints for orientation data? Read ', ...
-                               orient_no_of_joints_read, ' joints, for subject = ', thisdir3])
-                        end
-                                                
+                        % this becomes a structure now
+                        quality_issue.(thisdir3).(thisdir4) = check_import_quality(samples_pos, samples_orient, ...
+                                                                                     prob_joints_pos, prob_joints_orient, ...
+                                                                                     thisdir3, thisdir4, unexpec_cols, noRaw);
+                            
+                        % easy to visualize matrix
+                        problem_free_sessions(subject, exercise) = ...
+                            quality_issue.(thisdir3).(thisdir4).problemFreeSession;
+                                                                                 
+                        % Assign to a structure
                         data_as_struct.(thisdir3).(thisdir4).samples_pos = samples_pos;
                         data_as_struct.(thisdir3).(thisdir4).samples_orient = samples_orient;
                         data_as_struct.(thisdir3).(thisdir4).col_headers_pos = col_headers_pos;
@@ -89,9 +86,95 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
                 end
             end   
         end
+        
+        % disp('Problem Free Sessions (subject, exercise), 1 = problem-free')
+        % problem_free_sessions
 
 end
 
+function quality_issue = check_import_quality(samples_pos, samples_orient, ...
+                                              prob_joints_pos, prob_joints_orient, ...
+                                              subject, exercise, unexpec_cols, noRaw)
+
+    % This is called per exercise (So 5 times per subject)
+    joint_names = get_joint_names();    
+    
+    % init structure with flags
+    quality_issue.pos_noOfJoints = false;
+    quality_issue.pos_probJoints = false;
+    quality_issue.pos_noOfProbJoints = NaN;
+    quality_issue.pos_unexpec_cols = unexpec_cols.pos;
+    quality_issue.orient_noOfJoints = false;
+    quality_issue.orient_probJoints = false;
+    quality_issue.orient_noOfProbJoints = NaN;
+    quality_issue.orient_unexpec_cols = unexpec_cols.orient;
+    quality_issue.timestamps_unexpec_cols = unexpec_cols.t;
+    quality_issue.any_unexpected_cols = unexpec_cols.pos || ...
+                                        unexpec_cols.orient || ...
+                                        unexpec_cols.t;
+        
+    
+    quality_issue.noRawFilesFound = noRaw;
+    
+    % check that all the joints were read properly and
+    % there were no bugs (quick'n'dirty unit testing)                        
+    pos_no_of_joints_read =  length(samples_pos);                  
+    orient_no_of_joints_read = length(samples_orient);
+
+    if pos_no_of_joints_read ~= 25 
+        
+        if ~noRaw
+            warning(['For some reasons we did not get 25 joints for position data? Read ', ...
+                   num2str(pos_no_of_joints_read), ' joints, for subject = ', subject])
+            quality_issue.pos_noOfJoints = true;
+        else
+            % normal that you do not have 25 joints if you did not have any
+            % data to read at first place
+        end
+    end
+
+    
+    if orient_no_of_joints_read ~= 25 
+        
+        if ~noRaw
+            warning(['For some reasons we did not get 25 joints for orientation data? Read ', ...
+                    num2str(orient_no_of_joints_read), ' joints, for subject = ', subject])
+            quality_issue.pos_probJoints = true;
+        else
+            % normal that you do not have 25 joints if you did not have any
+            % data to read at first place
+        end
+    end
+    
+    
+    if sum(prob_joints_pos) > 0        
+        disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_pos)), ' problematic joints for position data'])
+        disp(['   ... joints: ', joint_names(prob_joints_pos)])
+        quality_issue.orient_noOfJoints = true;
+        quality_issue.pos_noOfProbJoints = sum(prob_joints_pos);
+    end
+    
+    
+    if sum(prob_joints_orient) > 0        
+        disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_orient)), ' problematic joints for orientation data'])
+        prob_joint_names = joint_names(prob_joints_orient);
+        concat_names = [sprintf('%s ',prob_joint_names{1:end-1}), prob_joint_names{end}];
+        disp(['   ... joints: ', concat_names]);
+        quality_issue.orient_probJoints = true;
+        quality_issue.orient_noOfProbJoints = sum(prob_joints_orient);
+    end    
+    
+    % problem free subject when all the boolean flags are false
+    quality_issue.problemFreeSession = (~quality_issue.pos_noOfJoints && ...
+                                        ~quality_issue.pos_probJoints && ...
+                                        ~quality_issue.orient_noOfJoints && ...
+                                        ~quality_issue.orient_probJoints && ...
+                                        ~quality_issue.noRawFilesFound && ...
+                                        ~quality_issue.any_unexpected_cols);
+    
+    % quality_issue
+                                    
+end
 
 function dirinfo = dir_script(pathData) 
 
@@ -125,8 +208,10 @@ function [TS, PO, CF, meta] = import_label_data(thisdir, dirinfo, specifier, exe
 end
 
 
-function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, timestamps, fps] = ...
-            import_raw_data(thisdir, dirinfo, specifier, exercise, subject, plot_ON_to_disk, pathData, class_label)
+function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
+          timestamps, fps, prob_joints_pos, prob_joints_orient, unexpec_cols, noRaw] = ...
+            import_raw_data(thisdir, dirinfo, specifier, exercise, subject, ...
+            plot_ON_to_disk, pathData, class_label)
 
     % disp(['Importing RAW data of ', specifier])
     % There are now 3 files:
@@ -142,6 +227,8 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, time
     
     no_of_files_and_dirs = length(tf);
     no_of_valid_files_and_dirs = sum(~tf);
+    
+    noRaw = false; % if there are no RAW files at all for this subject
     
     if no_of_valid_files_and_dirs >= 3
         
@@ -159,18 +246,23 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, time
 
             if contains(dirinfo(file_idx).name, 'JointPosition')
                 type_of_data = 'JointPosition';
-                [samples_pos, col_headers_pos] = parse_joints(dirinfo(file_idx).name, subject, ...
+                [samples_pos, col_headers_pos, prob_joints_pos, unexpec_cols.pos] = ...
+                    parse_joints(dirinfo(file_idx).name, subject, ...
                     mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);
+                
             elseif contains(dirinfo(file_idx).name, 'JointOrientation')
                 type_of_data = 'JointOrientation';
-                [samples_orient, col_headers_orient] = parse_joints(dirinfo(file_idx).name, subject, ...
-                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);       
+                [samples_orient, col_headers_orient, prob_joints_orient, unexpec_cols.orient] = ...
+                    parse_joints(dirinfo(file_idx).name, subject, ...
+                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);    
+                
             elseif contains(dirinfo(file_idx).name, 'TimeStamp')
                 % TODO! As timestamps are on their own file, you could want
                 % to import them first and use as input arguments to this
                 % subfunctions and use inside parse_joints() for plotting?
                 % Now we have assumed a fixed 30fps (33.3 ms delta_t)
-                [timestamps, delta_ms, fps] = parse_timestamps(dirinfo(file_idx).name, mat, size_in);
+                [timestamps, delta_ms, fps, unexpec_cols.t] = parse_timestamps(dirinfo(file_idx).name, mat, size_in);
+                
             elseif contains(dirinfo(file_idx).name, 'depth')
                 % TODO!            
             elseif contains(dirinfo(file_idx).name, 'RGB')
@@ -190,13 +282,22 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, time
         col_headers_orient = NaN;
         timestamps = NaN;
         fps = NaN;
+        noRaw = true;
+        unexpec_cols.pos = false;
+        unexpec_cols.orient = false;
+        unexpec_cols.t = false;
+        prob_joints_pos = NaN;
+        prob_joints_orient = NaN;
+        
         
     end
+   
 
 end
 
-function [samples, col_headers] = parse_joints(filename, subject, mat, exercise, size_in, ...
-                                               type_of_data, plot_ON_to_disk, pathData, class_label)
+function [samples, col_headers, problematic_joints, unexpec_cols] = ...
+                parse_joints(filename, subject, mat, exercise, size_in, ...
+                type_of_data, plot_ON_to_disk, pathData, class_label)
 
     % KiMoRe paper:
     % "the Raw folder includes raw data acquired directly from the 
@@ -223,13 +324,15 @@ function [samples, col_headers] = parse_joints(filename, subject, mat, exercise,
 
     % Hmmm... TODO! there are for some reason 101 columns now, 1 extra
     % 0 at the end. Some Windows/Unix line end thing?
+    unexpec_cols = false;
     if size_in(2) == 101
         mat = mat(:,1:100);
     elseif size_in(2) == 100
         % the correct number of columns 4x no_of_joints
     else
-        disp([filename, ' - YOU HAVE NOW unexpected number of columns! no_of_columns = ', num2str(size_in(2))])
+        disp(['   ...', filename, ' - YOU HAVE NOW unexpected number of columns! no_of_columns = ', num2str(size_in(2))])
         mat = mat(:,1:100);
+        unexpec_cols = true;
     end
     size_in = size(mat);    
     % disp([filename, ': no of rows (samples) = ', num2str(size_in(1)), ', no of cols (joints) = ', num2str(size_in(2))])        
@@ -274,12 +377,19 @@ function [samples, col_headers] = parse_joints(filename, subject, mat, exercise,
         
     end
     
-    no_of_data_cols = 4; % 4 columns per position and orientation
+    NO_OF_DATA_COLS = 4; % 4 columns per position and orientation
     idxs = cell(NO_OF_JOINTS,1);
     samples = cell(NO_OF_JOINTS,1);
-    missing_data_ratio = zeros(NO_OF_JOINTS, no_of_data_cols);
+    missing_data_ratio = zeros(NO_OF_JOINTS, NO_OF_DATA_COLS);
     missing_data_ratio(:) = NaN;
     joint_names = get_joint_names();
+    re_save_figure = false;
+    
+    % plot paths    
+    img_path_out = fullfile(pathData, 'TS_as_imgs');
+    filename_out = [class_label, '_', strrep(subject, '_', ''), ...
+                    '_ex', num2str(exercise), '_', type_of_data, '.png'];
+    fullpath_out = fullfile(img_path_out, filename_out);
     
     if plot_ON_to_disk
        
@@ -290,7 +400,7 @@ function [samples, col_headers] = parse_joints(filename, subject, mat, exercise,
        
        % plot handles
        sp = zeros(NO_OF_JOINTS, 1);
-       p = zeros(NO_OF_JOINTS, no_of_data_cols);
+       p = zeros(NO_OF_JOINTS, NO_OF_DATA_COLS);
        tit = zeros(NO_OF_JOINTS, 1);
        leg = zeros(NO_OF_JOINTS, 1);
        
@@ -299,7 +409,13 @@ function [samples, col_headers] = parse_joints(filename, subject, mat, exercise,
        
        sp_layout = [5 5]; % [rows, cols] subplot layout, TODO! if you 
                           % do Human3.6M or something else, this needs to be
-                          % adaptive
+                          % adaptive       
+                          
+       % Check if the output path exists 
+       if ~exist(img_path_out, 'dir')
+            mkdir(img_path_out)
+        end
+                          
     else
         
         sp_layout = NaN;
@@ -314,23 +430,37 @@ function [samples, col_headers] = parse_joints(filename, subject, mat, exercise,
         % Use subfunction so we can more easily check whether the data is
         % of a good quality per joint
         [samples{joint}, missing_data_ratio(joint,:), ...
-            sp(joint), p(joint,:), tit(joint), leg(joint), y_lims(joint,:)] = ...
+            sp(joint), p(joint,:), tit(joint), leg(joint), y_lims(joint,:), plotted] = ...
             raw_mat_struct_warapper(mat(:,idxs{joint}), idxs{joint}, joint, ...
                                     joint_names{joint}, filename, subject, exercise, type_of_data, ...
-                                    plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS);
+                                    plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS, ...
+                                    re_save_figure, img_path_out, filename_out, fullpath_out);
     end
     
     if plot_ON_to_disk
-        style_and_export_plot(fig, sp, p, tit, leg, y_lims, ...
-            filename, pathData, subject, exercise, type_of_data, class_label)
+        if plotted
+            style_and_export_plot(fig, sp, p, tit, leg, y_lims, ...
+                filename, pathData, subject, exercise, type_of_data, ...
+                class_label, re_save_figure, ... 
+                img_path_out, filename_out, fullpath_out)
+        else
+           close all  
+        end
     end
+    
+    % check how many joints had problems with all the values being zero
+    % i.e. the quaternion data of the orientation
+    problematic_joints = sum(missing_data_ratio, 2) == NO_OF_DATA_COLS;
+    
+    save tm.mat
     
 end
 
-function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims] = ...
+function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims, plotted] = ...
                     raw_mat_struct_warapper(mat_subset, idxs, joint, ...
                                              joint_name, filename, subject, exercise, type_of_data, ...
-                                             plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS)
+                                             plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS, ...
+                                             re_save_figure, img_path_out, filename_out, fullpath_out)
 
    missing_data_ratio = check_joint_data_quality(mat_subset);
    
@@ -347,40 +477,56 @@ function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims] = ...
    samples_per_joint = mat_subset;
    samples_per_joint = filter_data_with_missingness_ratio(samples_per_joint, missing_data_ratio);
    
+   sp = NaN;
+   p = NaN;
+   tit = NaN;
+   leg = NaN;
+   y_lims = NaN;
+   
+   plotted = true;
+   
    if plot_ON_to_disk
-       [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint, missing_data_ratio, filename, subject, ...
-                                   joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS);
-   else
-       sp = NaN;
-       p = NaN;
-       tit = NaN;
-       leg = NaN;
-       y_lims = NaN;
+       
+        if exist(fullpath_out, 'file') == 2
+            if re_save_figure            
+                disp('     Re-plotting the figure')
+                [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint, missing_data_ratio, filename, subject, ...
+                                       joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS);
+            else
+                if joint == 1 && exercise == 1 && strcmp(type_of_data, 'JointOrientation')
+                    disp('  .. Skip plotting joints to save time as this has been saved to disk already')
+                end
+                plotted = false;
+            end
+        else
+            [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint, missing_data_ratio, filename, subject, ...
+                                       joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS);
+        end    
    end
    
 
 end
 
 function style_and_export_plot(fig, sp, p, tit, leg, y_lims, ...
-                       filename, pathData, subject, exercise, type_of_data, class_label)
-
-    % Check if the output path exists 
-    img_path_out = fullfile(pathData, 'TS_as_imgs');
-    if ~exist(img_path_out, 'dir')
-       mkdir(img_path_out)
-    end
-    
-    % define output paths
-    filename_out = [class_label, '_', strrep(subject, '_', ''), ...
-                    '_ex', num2str(exercise), '_', type_of_data, '.png'];
-    fullpath_out = fullfile(img_path_out, filename_out);
+                       filename, pathData, subject, exercise, type_of_data, ...
+                       class_label, re_save_figure, ... 
+                       img_path_out, filename_out, fullpath_out)
     
     % style a bit 
     set(sp, 'FontSize', 7)
     
     % export to disk
-    disp('     Saving the figure as .png to disk')
-    saveas(fig, fullpath_out, 'png')
+    if exist(fullpath_out, 'file') == 2
+        if re_save_figure            
+            disp('     Re-Saving the figure as .png to disk')
+            saveas(fig, fullpath_out, 'png')
+        else
+            disp('Skip .png export as this was already saved')
+        end
+    else
+        disp('     Saving the figure as .png to disk')
+        saveas(fig, fullpath_out, 'png')        
+    end
     
     % and close the figure(s)
     close all
@@ -443,17 +589,19 @@ function samples_per_joint = filter_data_with_missingness_ratio(samples_per_join
     
 end
 
-function [timestamps, delta_ms, fps] = parse_timestamps(filename, mat, size_in)
+function [timestamps, delta_ms, fps, unexpec_cols] = parse_timestamps(filename, mat, size_in)
 
     % Hmmm... TODO! there are for some reason 2 columns now, 1 extra
     % 0 at the end. Some Windows/Unix line end thing?
+    unexpec_cols = false;
     if size_in(2) == 2
         mat = mat(:,1);
     elseif size_in(2) == 1
         % the correct number of columns 4x no_of_joints
     else
-        disp([filename, ' - YOU HAVE NOW unexpected number of columns for timestamps! no_of_columns = ', num2str(size_in(2))])
+        disp(['   ...', filename, ' - YOU HAVE NOW unexpected number of columns for timestamps! no_of_columns = ', num2str(size_in(2))])
         mat = mat(:,1);
+        unexpec_cols = true;
     end
     
     size_in = size(mat);    

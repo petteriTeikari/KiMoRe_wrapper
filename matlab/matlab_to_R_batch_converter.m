@@ -25,7 +25,7 @@ function matlab_to_R_batch_converter()
     
         if re_import_from_folders
             disp('Importing data from the folders')
-            plot_ON_to_disk = true;
+            plot_ON_to_disk = false;
             [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk);
             disp('Saving imported data to disk as .mat')
             save(fullfile(pathData, 'folder_import.mat'), 'data_as_struct', 'meta_as_struct')
