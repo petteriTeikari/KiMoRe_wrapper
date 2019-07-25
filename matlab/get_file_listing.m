@@ -1,4 +1,4 @@
-function [data_as_struct, meta_as_struct] = get_file_listing(pathData)
+function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk)
     
     %% https://uk.mathworks.com/matlabcentral/answers/32038-can-you-use-dir-to-list-files-in-subfolders
     
@@ -47,14 +47,30 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData)
                                [TS, PO, CF, meta] = ...
                                    import_label_data(full_path, dirinfo6, ' ', exercise, subject);
                            elseif strcmp(thisdir5, 'Raw') 
+                               class_label = [thisdir, thisdir2];
                                [samples_pos, samples_orient, col_headers_pos, col_headers_orient, timestamps, fps] = ...
-                                   import_raw_data(full_path, dirinfo6, ' ', exercise, subject);
+                                   import_raw_data(full_path, dirinfo6, ' ', exercise, thisdir3, plot_ON_to_disk, pathData, class_label);
                            else
                                % disp(['No specific action defined for subfolder name = ', thisdir5])
                            end                            
                             
                         end
                         
+                        % check that all the joints were read properly and
+                        % there were no bugs (quick'n'dirty unit testing)                        
+                        pos_no_of_joints_read =  length(samples_pos);                  
+                        orient_no_of_joints_read = length(samples_orient);
+                        
+                        if pos_no_of_joints_read ~= 25 
+                           warning(['For some reasons we did not get 25 joints for position data? Read ', ...
+                               pos_no_of_joints_read, ' joints, for subject = ', thisdir3])
+                        end
+                        
+                        if orient_no_of_joints_read ~= 25 
+                           warning(['For some reasons we did not get 25 joints for orientation data? Read ', ...
+                               orient_no_of_joints_read, ' joints, for subject = ', thisdir3])
+                        end
+                                                
                         data_as_struct.(thisdir3).(thisdir4).samples_pos = samples_pos;
                         data_as_struct.(thisdir3).(thisdir4).samples_orient = samples_orient;
                         data_as_struct.(thisdir3).(thisdir4).col_headers_pos = col_headers_pos;
@@ -110,10 +126,9 @@ end
 
 
 function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, timestamps, fps] = ...
-            import_raw_data(thisdir, dirinfo, specifier, exercise, subject)
+            import_raw_data(thisdir, dirinfo, specifier, exercise, subject, plot_ON_to_disk, pathData, class_label)
 
     % disp(['Importing RAW data of ', specifier])
-    
     % There are now 3 files:
     % * JointOrientation011214_103748.csv
     % * JointPosition011214_103748.csv
@@ -144,11 +159,17 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, time
 
             if contains(dirinfo(file_idx).name, 'JointPosition')
                 type_of_data = 'JointPosition';
-                [samples_pos, col_headers_pos] = parse_joints(dirinfo(file_idx).name, mat, exercise, size_in, type_of_data);
+                [samples_pos, col_headers_pos] = parse_joints(dirinfo(file_idx).name, subject, ...
+                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);
             elseif contains(dirinfo(file_idx).name, 'JointOrientation')
                 type_of_data = 'JointOrientation';
-                [samples_orient, col_headers_orient] = parse_joints(dirinfo(file_idx).name, mat, exercise, size_in, type_of_data);       
+                [samples_orient, col_headers_orient] = parse_joints(dirinfo(file_idx).name, subject, ...
+                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);       
             elseif contains(dirinfo(file_idx).name, 'TimeStamp')
+                % TODO! As timestamps are on their own file, you could want
+                % to import them first and use as input arguments to this
+                % subfunctions and use inside parse_joints() for plotting?
+                % Now we have assumed a fixed 30fps (33.3 ms delta_t)
                 [timestamps, delta_ms, fps] = parse_timestamps(dirinfo(file_idx).name, mat, size_in);
             elseif contains(dirinfo(file_idx).name, 'depth')
                 % TODO!            
@@ -174,7 +195,8 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, time
 
 end
 
-function [samples, col_headers] = parse_joints(filename, mat, exercise, size_in, type_of_data)
+function [samples, col_headers] = parse_joints(filename, subject, mat, exercise, size_in, ...
+                                               type_of_data, plot_ON_to_disk, pathData, class_label)
 
     % KiMoRe paper:
     % "the Raw folder includes raw data acquired directly from the 
@@ -209,18 +231,8 @@ function [samples, col_headers] = parse_joints(filename, mat, exercise, size_in,
         disp([filename, ' - YOU HAVE NOW unexpected number of columns! no_of_columns = ', num2str(size_in(2))])
         mat = mat(:,1:100);
     end
-    size_in = size(mat);
-    
+    size_in = size(mat);    
     % disp([filename, ': no of rows (samples) = ', num2str(size_in(1)), ', no of cols (joints) = ', num2str(size_in(2))])        
-    
-    idxs = cell(NO_OF_JOINTS,1);
-    samples = cell(NO_OF_JOINTS,1);
-    
-    for joint = 1 : NO_OF_JOINTS
-        start_idx = ((joint-1)*NO_OF_VARS_PER_JOINT)+1;
-        idxs{joint} = [start_idx:(start_idx+NO_OF_VARS_PER_JOINT-1)];
-        samples{joint} = mat(:,idxs{joint});
-    end
     
     if strcmp(type_of_data, 'JointOrientation')
         
@@ -258,11 +270,176 @@ function [samples, col_headers] = parse_joints(filename, mat, exercise, size_in,
         % 0.43 meters below the sensor and 2.19 meters in front of the sensor.
         col_headers = {'cameraX'; 'cameraY'; 'cameraZ'; 'confidenceState'};
         % Confidence state (2 if the joints is tracked, 
-        %                   1 if the joint is estimated).
+        %                   1 if the joint is estimated).        
+        
+    end
+    
+    no_of_data_cols = 4; % 4 columns per position and orientation
+    idxs = cell(NO_OF_JOINTS,1);
+    samples = cell(NO_OF_JOINTS,1);
+    missing_data_ratio = zeros(NO_OF_JOINTS, no_of_data_cols);
+    missing_data_ratio(:) = NaN;
+    joint_names = get_joint_names();
+    
+    if plot_ON_to_disk
+       
+       fig = figure('Color', 'w', 'Name', filename);
+           scrsz = get(0,'ScreenSize'); % tells us the screen size
+           set(fig, 'Position', [0.02*scrsz(3) 0.02*scrsz(4) 0.9*scrsz(3) 0.8*scrsz(4)]); 
+
+       
+       % plot handles
+       sp = zeros(NO_OF_JOINTS, 1);
+       p = zeros(NO_OF_JOINTS, no_of_data_cols);
+       tit = zeros(NO_OF_JOINTS, 1);
+       leg = zeros(NO_OF_JOINTS, 1);
+       
+       % y-range for each subplot, so you can apply constant scaling
+       y_lims = zeros(NO_OF_JOINTS, 2);
+       
+       sp_layout = [5 5]; % [rows, cols] subplot layout, TODO! if you 
+                          % do Human3.6M or something else, this needs to be
+                          % adaptive
+    else
+        
+        sp_layout = NaN;
         
     end
         
+    for joint = 1 : NO_OF_JOINTS
+        
+        start_idx = ((joint-1)*NO_OF_VARS_PER_JOINT)+1;
+        idxs{joint} = [start_idx:(start_idx+NO_OF_VARS_PER_JOINT-1)];
+        
+        % Use subfunction so we can more easily check whether the data is
+        % of a good quality per joint
+        [samples{joint}, missing_data_ratio(joint,:), ...
+            sp(joint), p(joint,:), tit(joint), leg(joint), y_lims(joint,:)] = ...
+            raw_mat_struct_warapper(mat(:,idxs{joint}), idxs{joint}, joint, ...
+                                    joint_names{joint}, filename, subject, exercise, type_of_data, ...
+                                    plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS);
+    end
     
+    if plot_ON_to_disk
+        style_and_export_plot(fig, sp, p, tit, leg, y_lims, ...
+            filename, pathData, subject, exercise, type_of_data, class_label)
+    end
+    
+end
+
+function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims] = ...
+                    raw_mat_struct_warapper(mat_subset, idxs, joint, ...
+                                             joint_name, filename, subject, exercise, type_of_data, ...
+                                             plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS)
+
+   missing_data_ratio = check_joint_data_quality(mat_subset);
+   
+   % TODO! verbose flag as this throws out a lot of prints on console
+   verbose_full = false;
+   if verbose_full
+       disp([' ', type_of_data, ', Exercise = ', num2str(exercise), ' (joint idx = ', num2str(joint), ...
+           ', col_idxs = ', num2str(idxs), '), with the following missingness ratio (per col) = ', ...
+           num2str(missing_data_ratio)])
+   end
+   
+   % TODO! Now it is up to you determine what to do with the
+   % missingness_ratio. Is the whole recording useless or what   
+   samples_per_joint = mat_subset;
+   samples_per_joint = filter_data_with_missingness_ratio(samples_per_joint, missing_data_ratio);
+   
+   if plot_ON_to_disk
+       [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint, missing_data_ratio, filename, subject, ...
+                                   joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS);
+   else
+       sp = NaN;
+       p = NaN;
+       tit = NaN;
+       leg = NaN;
+       y_lims = NaN;
+   end
+   
+
+end
+
+function style_and_export_plot(fig, sp, p, tit, leg, y_lims, ...
+                       filename, pathData, subject, exercise, type_of_data, class_label)
+
+    % Check if the output path exists 
+    img_path_out = fullfile(pathData, 'TS_as_imgs');
+    if ~exist(img_path_out, 'dir')
+       mkdir(img_path_out)
+    end
+    
+    % define output paths
+    filename_out = [class_label, '_', strrep(subject, '_', ''), ...
+                    '_ex', num2str(exercise), '_', type_of_data, '.png'];
+    fullpath_out = fullfile(img_path_out, filename_out);
+    
+    % style a bit 
+    set(sp, 'FontSize', 7)
+    
+    % export to disk
+    disp('     Saving the figure as .png to disk')
+    saveas(fig, fullpath_out, 'png')
+    
+    % and close the figure(s)
+    close all
+
+end
+
+function ratio_of_zeros = check_joint_data_quality(mat_subset)
+
+    % Kinect V2 does not seem to give NaNs for missing values, but zeros?
+    is_zero = mat_subset == 0;
+    no_of_zeros_per_column = sum(is_zero);
+    ratio_of_zeros = no_of_zeros_per_column / length(mat_subset);  
+    
+end
+
+function [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint, missing_data_ratio, filename, subject, ...
+                                   joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS)
+    
+    % Setup time vector on each call to this (not a major overhead, but
+    % still you could want to TODO!)
+    fps = 30;
+    end_time = (length(samples_per_joint)-1)*(1/fps); % time starts from 0
+    timestamps = linspace(0, end_time, length(samples_per_joint))';
+                               
+    % Set up subplot layout
+    sp = subplot(sp_layout(1), sp_layout(2), joint);    
+    p = plot(timestamps, samples_per_joint);
+    p = p'; % transpose as we collect this to a matrix
+    
+    % the first subplot
+    if joint == 1
+        % titString = [type_of_data, ' | ', subject, ' | ex', num2str(exercise), ' | ', joint_name];
+        tit = title({[type_of_data, ' | ', subject, ' | ex', num2str(exercise)], joint_name}, ...
+                    'interpreter', 'none');
+    elseif joint == 2 % the second
+        tit = title({filename, joint_name}, ...
+                    'interpreter', 'none');
+    else
+        titString = [joint_name];
+        tit = title(joint_name, 'interpreter', 'none');
+    end
+        
+    leg = legend(sp, col_headers);    
+    if joint == NO_OF_JOINTS
+       set(leg,'FontSize', 6)
+    else
+       set(leg,'visible', 'off')
+    end    
+        
+    y_lims = [min(samples_per_joint(:)) max(samples_per_joint(:))];
+    drawnow    
+                               
+end
+
+function samples_per_joint = filter_data_with_missingness_ratio(samples_per_joint, missing_data_ratio)
+
+    missingness_threshold = 1; % 1.00 when all values are zero
+    is_above_threshold = missing_data_ratio >= missingness_threshold;    
+    samples_per_joint(:, is_above_threshold) = NaN;
     
 end
 
