@@ -1,4 +1,4 @@
-function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk)
+function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk, mask_outliers, filter_outliers)
     
     %% https://uk.mathworks.com/matlabcentral/answers/32038-can-you-use-dir-to-list-files-in-subfolders
     
@@ -17,7 +17,7 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
     %% Go through the subfolders    
         
         subjCount = 0;
-        problem_free_sessions = logical(zeros())
+        problem_free_sessions = logical(zeros());
     
         for group = 1 : length(dirinfo)
           thisdir = dirinfo(group).name;
@@ -27,6 +27,8 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
                 thisdir2 = dirinfo2(subgroup).name;
                 dirinfo3 = dir_script(fullfile(pathData, thisdir, thisdir2));
             
+                % TODO! you could make this a "parfor"-loop for faster
+                % import if you feel like
                 for subject = 1 : length(dirinfo3)
                     subjCount = subjCount + 1;
                     thisdir3 = dirinfo3(subject).name;
@@ -51,7 +53,8 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
                                class_label = [thisdir, thisdir2];
                                [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
                                    timestamps, fps, prob_joints_pos, prob_joints_orient, unexpec_cols, noRaw] = ...
-                                   import_raw_data(full_path, dirinfo6, ' ', exercise, thisdir3, plot_ON_to_disk, pathData, class_label);
+                                   import_raw_data(full_path, dirinfo6, ' ', exercise, thisdir3, plot_ON_to_disk, ...
+                                   pathData, class_label, mask_outliers, filter_outliers);
                            else
                                % disp(['No specific action defined for subfolder name = ', thisdir5])
                            end                            
@@ -63,7 +66,7 @@ function [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_t
                                                                                      prob_joints_pos, prob_joints_orient, ...
                                                                                      thisdir3, thisdir4, unexpec_cols, noRaw);
                             
-                        % easy to visualize matrix
+                        % put the structure into an easier to visualize matrix
                         problem_free_sessions(subject, exercise) = ...
                             quality_issue.(thisdir3).(thisdir4).problemFreeSession;
                                                                                  
@@ -148,18 +151,18 @@ function quality_issue = check_import_quality(samples_pos, samples_orient, ...
     
     
     if sum(prob_joints_pos) > 0        
-        disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_pos)), ' problematic joints for position data'])
-        disp(['   ... joints: ', joint_names(prob_joints_pos)])
+        % disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_pos)), ' problematic joints for position data'])
+        % disp(['   ... joints: ', joint_names(prob_joints_pos)])
         quality_issue.orient_noOfJoints = true;
         quality_issue.pos_noOfProbJoints = sum(prob_joints_pos);
     end
     
     
     if sum(prob_joints_orient) > 0        
-        disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_orient)), ' problematic joints for orientation data'])
+        % disp([' ', exercise, ' --> There were ', num2str(sum(prob_joints_orient)), ' problematic joints for orientation data'])
         prob_joint_names = joint_names(prob_joints_orient);
         concat_names = [sprintf('%s ',prob_joint_names{1:end-1}), prob_joint_names{end}];
-        disp(['   ... joints: ', concat_names]);
+        % disp(['   ... joints: ', concat_names]);
         quality_issue.orient_probJoints = true;
         quality_issue.orient_noOfProbJoints = sum(prob_joints_orient);
     end    
@@ -209,9 +212,10 @@ end
 
 
 function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
-          timestamps, fps, prob_joints_pos, prob_joints_orient, unexpec_cols, noRaw] = ...
+          timestamps, fps, prob_joints_pos, prob_joints_orient, unexpec_cols, noRaw, ...
+          missing_from_confidence] = ...
             import_raw_data(thisdir, dirinfo, specifier, exercise, subject, ...
-            plot_ON_to_disk, pathData, class_label)
+            plot_ON_to_disk, pathData, class_label, mask_outliers, filter_outliers)
 
     % disp(['Importing RAW data of ', specifier])
     % There are now 3 files:
@@ -223,20 +227,31 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
     
     % TODO! If you want to process the RGB and D videos!
     tf = ismember( {dirinfo.name}, {'.', '..'});
-    dirinfo(tf) = [];  %remove current and parent directory.
-    
+    dirinfo(tf) = [];  %remove current and parent directory.    
+    custom_order = [2 1 3]; % pos, orient, timestamp
+        
     no_of_files_and_dirs = length(tf);
     no_of_valid_files_and_dirs = sum(~tf);
     
     noRaw = false; % if there are no RAW files at all for this subject
+    missing_from_confidence = NaN;
     
     if no_of_valid_files_and_dirs >= 3
         
         for file_idx = 1 : length(dirinfo)        
 
-            filename_in = fullfile(thisdir, dirinfo(file_idx).name);        
-            mat = csvread(filename_in);              
-
+            if file_idx > 3
+                warning(['We found more than 3 files in = ', thisdir])
+                warning(['Files found = ', dirinfo.name])
+                % TODO! Actually nothing is done automatically about this
+                % only a warning, and you have to manually delete the files
+                % that you do not want
+            end
+            
+            
+            filename_in = fullfile(thisdir, dirinfo(custom_order(file_idx)).name);
+            mat = csvread(filename_in);
+            
             % Note! If you open the .csv files in Excel, you notice that there
             % are some empty rows in the beginning of the files, csvread
             % ignores them automatically (it seems like it at least on 2017a) s
@@ -244,24 +259,24 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
             % mat = remove_empty_rows(mat);
             size_in = size(mat);
 
-            if contains(dirinfo(file_idx).name, 'JointPosition')
+            if contains(filename_in, 'JointPosition')
                 type_of_data = 'JointPosition';
-                [samples_pos, col_headers_pos, prob_joints_pos, unexpec_cols.pos] = ...
-                    parse_joints(dirinfo(file_idx).name, subject, ...
-                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);
+                [samples_pos, col_headers_pos, prob_joints_pos, unexpec_cols.pos, missing_from_confidence] = ...
+                    parse_joints(filename_in, subject, ...
+                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label, mask_outliers, filter_outliers, missing_from_confidence);
                 
-            elseif contains(dirinfo(file_idx).name, 'JointOrientation')
+            elseif contains(filename_in, 'JointOrientation')
                 type_of_data = 'JointOrientation';
-                [samples_orient, col_headers_orient, prob_joints_orient, unexpec_cols.orient] = ...
-                    parse_joints(dirinfo(file_idx).name, subject, ...
-                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label);    
+                [samples_orient, col_headers_orient, prob_joints_orient, unexpec_cols.orient, ~] = ...
+                    parse_joints(filename_in, subject, ...
+                    mat, exercise, size_in, type_of_data, plot_ON_to_disk, pathData, class_label, mask_outliers, filter_outliers, missing_from_confidence);    
                 
             elseif contains(dirinfo(file_idx).name, 'TimeStamp')
                 % TODO! As timestamps are on their own file, you could want
                 % to import them first and use as input arguments to this
                 % subfunctions and use inside parse_joints() for plotting?
                 % Now we have assumed a fixed 30fps (33.3 ms delta_t)
-                [timestamps, delta_ms, fps, unexpec_cols.t] = parse_timestamps(dirinfo(file_idx).name, mat, size_in);
+                [timestamps, delta_ms, fps, unexpec_cols.t] = parse_timestamps(filename_in, mat, size_in);
                 
             elseif contains(dirinfo(file_idx).name, 'depth')
                 % TODO!            
@@ -295,9 +310,10 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
 
 end
 
-function [samples, col_headers, problematic_joints, unexpec_cols] = ...
+function [samples, col_headers, problematic_joints, unexpec_cols, outliers] = ...
                 parse_joints(filename, subject, mat, exercise, size_in, ...
-                type_of_data, plot_ON_to_disk, pathData, class_label)
+                type_of_data, plot_ON_to_disk, pathData, class_label, ...
+                mask_outliers, filter_outliers, missing_from_confidence)
 
     % KiMoRe paper:
     % "the Raw folder includes raw data acquired directly from the 
@@ -353,7 +369,7 @@ function [samples, col_headers, problematic_joints, unexpec_cols] = ...
         % but ultimately are converted back to matrix form and your 
         % graphics programming environment most-likely 
         % provides functions to do this.
-        col_headers = {'AbsQuat_1'; 'AbsQuat_2'; 'AbsQuat_3'; 'AbsQuat_4'};
+        col_headers = {'AbsQuat_X'; 'AbsQuat_Y'; 'AbsQuat_Z'; 'AbsQuat_W'};
         
     elseif strcmp(type_of_data, 'JointPosition')        
         
@@ -380,6 +396,7 @@ function [samples, col_headers, problematic_joints, unexpec_cols] = ...
     NO_OF_DATA_COLS = 4; % 4 columns per position and orientation
     idxs = cell(NO_OF_JOINTS,1);
     samples = cell(NO_OF_JOINTS,1);
+    outliers = cell(NO_OF_JOINTS,1);
     missing_data_ratio = zeros(NO_OF_JOINTS, NO_OF_DATA_COLS);
     missing_data_ratio(:) = NaN;
     joint_names = get_joint_names();
@@ -389,6 +406,11 @@ function [samples, col_headers, problematic_joints, unexpec_cols] = ...
     img_path_out = fullfile(pathData, 'TS_as_imgs');
     filename_out = [class_label, '_', strrep(subject, '_', ''), ...
                     '_ex', num2str(exercise), '_', type_of_data, '.png'];
+    if mask_outliers
+        filename_out = strrep(filename_out, '.png', '_outliersMasked.png');
+    elseif filter_outliers
+        filename_out = strrep(filename_out, '.png', '_outliersFiltered.png');
+    end
     fullpath_out = fullfile(img_path_out, filename_out);
     
     if plot_ON_to_disk
@@ -425,16 +447,17 @@ function [samples, col_headers, problematic_joints, unexpec_cols] = ...
     for joint = 1 : NO_OF_JOINTS
         
         start_idx = ((joint-1)*NO_OF_VARS_PER_JOINT)+1;
-        idxs{joint} = [start_idx:(start_idx+NO_OF_VARS_PER_JOINT-1)];
+        idxs{joint} = [start_idx:(start_idx+NO_OF_VARS_PER_JOINT-1)];                
         
         % Use subfunction so we can more easily check whether the data is
         % of a good quality per joint
-        [samples{joint}, missing_data_ratio(joint,:), ...
+        [samples{joint}, outliers{joint}, missing_data_ratio(joint,:), ...
             sp(joint), p(joint,:), tit(joint), leg(joint), y_lims(joint,:), plotted] = ...
             raw_mat_struct_warapper(mat(:,idxs{joint}), idxs{joint}, joint, ...
                                     joint_names{joint}, filename, subject, exercise, type_of_data, ...
                                     plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS, ...
-                                    re_save_figure, img_path_out, filename_out, fullpath_out);
+                                    re_save_figure, img_path_out, filename_out, fullpath_out, ...
+                                    mask_outliers, filter_outliers, missing_from_confidence);
     end
     
     if plot_ON_to_disk
@@ -452,15 +475,14 @@ function [samples, col_headers, problematic_joints, unexpec_cols] = ...
     % i.e. the quaternion data of the orientation
     problematic_joints = sum(missing_data_ratio, 2) == NO_OF_DATA_COLS;
     
-    save tm.mat
-    
 end
 
-function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims, plotted] = ...
+function [samples_per_joint, outliers_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims, plotted] = ...
                     raw_mat_struct_warapper(mat_subset, idxs, joint, ...
                                              joint_name, filename, subject, exercise, type_of_data, ...
                                              plot_ON_to_disk, sp_layout, col_headers, NO_OF_JOINTS, ...
-                                             re_save_figure, img_path_out, filename_out, fullpath_out)
+                                             re_save_figure, img_path_out, filename_out, fullpath_out, ...
+                                             mask_outliers, filter_outliers, missing_from_confidence)
 
    missing_data_ratio = check_joint_data_quality(mat_subset);
    
@@ -474,8 +496,44 @@ function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims, plotte
    
    % TODO! Now it is up to you determine what to do with the
    % missingness_ratio. Is the whole recording useless or what   
+   
+   % UPDATE so many of the joints in orientation are just zeroes due to the
+   % their location in the kinematic chain, see: 
+   % https://github.com/petteriTeikari/KiMoRe_wrapper/issues/1#issuecomment-515382389
    samples_per_joint = mat_subset;
-   samples_per_joint = filter_data_with_missingness_ratio(samples_per_joint, missing_data_ratio);
+   % samples_per_joint = filter_data_with_missingness_ratio(samples_per_joint, missing_data_ratio);
+   % Not replacing full zero vectors with NaN values
+   
+   if iscell(missing_from_confidence)
+        outliers_per_joint = missing_from_confidence{joint}; % for orientation, use the pose confidence
+        if verbose_full
+            disp('Orientation')
+        end
+   end
+   
+   if length(missing_from_confidence) == 1
+       if isnan(missing_from_confidence)
+            if verbose_full
+                disp('Position')
+            end
+            outliers_per_joint = samples_per_joint(:,4);
+       end
+   end
+   
+   if mask_outliers
+        outliers_per_joint = outliers_per_joint == 1;
+        if verbose_full
+            disp([' .... number of outliers = ', num2str(sum(outliers_per_joint))])
+        end
+        outliers_per_joint_repMat = repmat(outliers_per_joint, 1, 4);
+        samples_per_joint(outliers_per_joint_repMat) = NaN;       
+   end
+   
+   if filter_outliers
+       samples_per_joint = filter_indiv_joint_for_outliers(samples_per_joint, mat_subset, ...
+                                                           outliers_per_joint_repMat, ... 
+                                                           joint, type_of_data);
+   end
    
    sp = NaN;
    p = NaN;
@@ -503,6 +561,44 @@ function [samples_per_joint, missing_data_ratio, sp, p, tit, leg, y_lims, plotte
                                        joint_name, joint, exercise, type_of_data, sp_layout, col_headers, NO_OF_JOINTS);
         end    
    end
+   
+
+end
+
+function samples_filtered = filter_indiv_joint_for_outliers(samples_masked, samples_raw, ...
+                                                            outliers_per_joint_repMat, ...
+                                                             joint, type_of_data)
+                                                        
+        
+    if strcmp(type_of_data, 'JointPosition')
+        
+        % From original Matlab code by the Kimore authors
+        filtCutOff = 1;
+        sample=30;
+        [b, a] = butter(3, (2*filtCutOff)/sample, 'low');
+        samples_filtered = filtfilt(b, a, samples_raw);    
+    
+    elseif strcmp(type_of_data, 'JointOrientation')
+        
+        
+        % findchangepts(samples_raw(:,1),'Statistic','linear','MinThreshold',0.5)
+        % findchangepts(samples_raw(:,1),'Statistic','std','MinThreshold',25)
+        % findchangepts(samples_raw(:,1),'Statistic','rms','MinThreshold',12)
+        % TODO! If you care at this point
+        samples_filtered = samples_raw;
+        
+    else
+        
+        error(type_of_data, ' type_of_data not supported!')        
+        
+    end   
+   
+    %     close all    
+    %     subplot(3,1,1); plot(samples_raw)
+    %     subplot(3,1,2); plot(samples_filtered)
+    %     subplot(3,1,3); plot(samples_raw-samples_filtered)
+
+    
    
 
 end
@@ -549,14 +645,15 @@ function [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint
     % still you could want to TODO!)
     fps = 30;
     end_time = (length(samples_per_joint)-1)*(1/fps); % time starts from 0
-    timestamps = linspace(0, end_time, length(samples_per_joint))';
-                               
-    % Set up subplot layout
+    timestamps = linspace(0, end_time, length(samples_per_joint))';                               
+    % save plot.mat
+    
+    %% Set up subplot layout
     sp = subplot(sp_layout(1), sp_layout(2), joint);    
     p = plot(timestamps, samples_per_joint);
     p = p'; % transpose as we collect this to a matrix
     
-    % the first subplot
+    %% the first subplot
     if joint == 1
         % titString = [type_of_data, ' | ', subject, ' | ex', num2str(exercise), ' | ', joint_name];
         tit = title({[type_of_data, ' | ', subject, ' | ex', num2str(exercise)], joint_name}, ...
@@ -569,7 +666,7 @@ function [sp, p, tit, leg, y_lims] = plot_joint_data_per_joint(samples_per_joint
         tit = title(joint_name, 'interpreter', 'none');
     end
         
-    leg = legend(sp, col_headers);    
+    leg = legend(sp, col_headers, 'interpreter', 'none');    
     if joint == NO_OF_JOINTS
        set(leg,'FontSize', 6)
     else

@@ -12,6 +12,9 @@ function matlab_to_R_batch_converter()
     %% Parameters
     
         re_import_from_folders = true;
+        plot_ON_to_disk = false;
+        mask_outliers = true; % only uses the confidence state to remove outliers
+        filter_outliers = true; % more advanced outlier removal then
     
     %% Define data location    
     
@@ -24,9 +27,8 @@ function matlab_to_R_batch_converter()
     %% Import the raw data from the disk
     
         if re_import_from_folders
-            disp('Importing data from the folders')
-            plot_ON_to_disk = false;
-            [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk);
+            disp('Importing data from the folders')            
+            [data_as_struct, meta_as_struct] = get_file_listing(pathData, plot_ON_to_disk, mask_outliers, filter_outliers);
             disp('Saving imported data to disk as .mat')
             save(fullfile(pathData, 'folder_import.mat'), 'data_as_struct', 'meta_as_struct')
         else
@@ -64,6 +66,8 @@ function export_to_disk(joints_structure, meta_as_struct, pathData)
     
     %% HDF5 export
     hdf5export_wrapper(fullfile(pathData, 'KiMoRe.h5'), joints_structure, meta_as_struct)
+    
+    
 
 
 end
