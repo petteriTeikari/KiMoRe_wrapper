@@ -43,6 +43,11 @@ function matlab_to_R_batch_converter()
     %% Re-arrange the joint data
         
         joint_tables = re_arrange_data(data_as_struct);
+        if length(fieldnames(joint_tables.E_ID1.Es1.joints)) ~= 25
+           error(['You should have had 25 joints sin the re-arranged data', ...
+                 'Now you have ', num2str(length(fieldnames(joint_tables.E_ID1.Es1.joints))), ' joints?']) 
+        end       
+        
     
     %% Combine the meta data with the arranged joint data
         
@@ -62,13 +67,13 @@ end
 function export_to_disk(joints_structure, meta_as_struct, pathData) 
     
     %% Quick'n'dirty .mat export (if you continue with Matlab analysis)
-    save(fullfile(pathData, 'arranged_data.mat'), 'joints_structure')
+    % save(fullfile(pathData, 'arranged_data.mat'), 'joints_structure')
     
     %% HDF5 export
-    hdf5export_wrapper(fullfile(pathData, 'KiMoRe.h5'), joints_structure, meta_as_struct)
+    % hdf5export_wrapper(fullfile(pathData, 'KiMoRe.h5'), joints_structure, meta_as_struct)
     
-    
-
+    %% JSON with NTU-RGBD / Kinetics structure
+    json_export_wrapper(joints_structure, meta_as_struct, pathData)
 
 end
 
