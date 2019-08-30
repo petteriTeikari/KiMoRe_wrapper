@@ -19,6 +19,9 @@ Standardizing the data and checking for data quality with the Matlab script `mat
 * GPP-P = 3 (Parkinson’s disease)
 * GPP-B = 4 (Low Back Pain)
 
+[![alt text](https://github.com/petteriTeikari/KiMoRe_R/blob/master/imgs/youtube_screencap.png "youtube_screencap.png")](https://youtu.be/HVF_G9zguJc)
+_*Upper row* contains RAW values (left, position, right, orientation), and the *bottom* row contains the timeseries with estimated (non-tracked) joint positions and orientations dropped._ https://youtu.be/HVF_G9zguJc
+
 ## KiMoRe
 
 See details about the dataset on the [Wiki page](https://github.com/petteriTeikari/KiMoRe_wrapper/wiki)
