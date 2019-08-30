@@ -5,14 +5,10 @@ function joint_tables = re_arrange_data(data_as_struct)
     for subj = 1 : length(subj_codes)
         subj_code = subj_codes{subj};
         exercises = fieldnames(data_as_struct.(subj_code));
-        for ex = 1 : length(exercises)
-            
-            ex_idx = str2double(strrep(exercises{ex}, 'Es', ''));
-            
-            data_in = data_as_struct.(subj_codes{subj}).(exercises{ex});
-            
-            joint_tables.(subj_codes{subj}).(exercises{ex}).joints = combine_columns(data_in);
-            
+        for ex = 1 : length(exercises)            
+            ex_idx = str2double(strrep(exercises{ex}, 'Es', ''));            
+            data_in = data_as_struct.(subj_codes{subj}).(exercises{ex});            
+            joint_tables.(subj_codes{subj}).(exercises{ex}).joints = combine_columns(data_in);            
         end
     end
 
@@ -39,8 +35,9 @@ function joint_tables = combine_columns(data_in)
     no_of_joints = length(data_in.samples_pos);
     joint_names = get_joint_names();
     
+    %%
     for joint = 1 : no_of_joints
-               
+        
         if iscell(data_in.samples_pos)
             pos = data_in.samples_pos{joint};
             orient = data_in.samples_orient{joint};        
@@ -68,6 +65,9 @@ function joint_tables = combine_columns(data_in)
         end
         
         joint_tables.(joint_names{joint}) = table_per_joint;       
+        
     end
+    
+    
     
 end

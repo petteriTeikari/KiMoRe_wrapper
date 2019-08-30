@@ -250,7 +250,16 @@ function [samples_pos, samples_orient, col_headers_pos, col_headers_orient, ...
             
             
             filename_in = fullfile(thisdir, dirinfo(custom_order(file_idx)).name);
-            mat = csvread(filename_in);
+            try 
+                mat = csvread(filename_in);
+            catch
+                disp(filename_in)
+                % TODO! When for example you have some file open on
+                % LibreOffice, "Raw/.~lock.JointPosition011214_103748.csv#"
+                mat = csvread(filename_in);
+            end
+            
+            
             
             % Note! If you open the .csv files in Excel, you notice that there
             % are some empty rows in the beginning of the files, csvread
