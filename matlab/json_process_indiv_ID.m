@@ -16,6 +16,22 @@ function json_process_indiv_ID(data_per_subj_per_ex, ...
     % coordinates, and not orientation (and not about the color, depth,
     % etc. information)
     
+    % TODO! NE_ID15Es1.skeleton
+    #  57%       | 174/306 [00:14<00:11, 11.94it/s]An exception occurred at frame = 397  of file = ../../data/kimore/skeletons/NE_ID15Es1.skeleton
+
+    # ../../data/kimore/skeletons/NE_ID15Es1.skeleton
+    # Traceback (most recent call last):
+    #   File "kimore_gendata.py", line 210, in <module>
+    #     part=p)
+    #   File "kimore_gendata.py", line 180, in gendata
+    #     data = read_xyz(os.path.join(data_path, s), max_body=max_body_kinect,     
+    # num_joint=num_joint)
+    #   File "kimore_gendata.py", line 122, in read_xyz
+    #     seq_info = read_skeleton_filter(file)
+    # File "kimore_gendata.py", line 92, in read_skeleton_filter
+    #     body_info['numJoint'] = int(f.readline())
+    # ValueError: invalid literal for int() with base 10: '
+
     %%
     format = 'ntu';
     no_of_frames = height(data_per_subj_per_ex.spinebase);
